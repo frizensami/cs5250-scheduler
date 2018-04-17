@@ -19,8 +19,11 @@ Revision 2:
     Thanks Lee Wei Ping for trying and pointing out the difficulty & ambiguity with future_prediction SRTF.
 '''
 import sys
+from Queue import Queue
 
 input_file = 'input.txt'
+
+DEBUG = True
 
 class Process:
     last_scheduled_time = 0
@@ -50,7 +53,57 @@ def FCFS_scheduling(process_list):
 #Output_1 : Schedule list contains pairs of (time_stamp, proccess_id) indicating the time switching to that proccess_id
 #Output_2 : Average Waiting Time
 def RR_scheduling(process_list, time_quantum ):
-    return (["to be completed, scheduling process_list on round robin policy with time_quantum"], 0.0)
+    '''
+    RR Scheduling:
+        - When a process arrives, it's enqueued into a ready queue
+        - If no process currently executing, start executing head of queue
+        - Three scenarios
+            - Process ends before time quantum Q expires
+            - Time quantum Q expires:
+                - Process is done : nothing to do
+                - Process not done: needs to go back into ready queue
+    '''
+    if not process_list:
+        return (["no processes given"], 0.0)
+
+    schedule = []
+    current_time = 0
+    waiting_time = 0
+    ready_queue = []
+
+    def add_arrived_processes_to_ready_queue(old_ready_queue, process_list):
+        arrived_processes = filter(lambda p: p.arrive_time <= current_time, process_list)
+        remaining_processes = filter(lambda p: p.arrive_time > current_time, process_list)
+        # Our new ready queue includes the processes that just arrived - and we return the remaining processes
+        old_ready_queue.extend(arrived_processes)
+        return remaining_processes
+
+    # Add arrived processes before we start (should just be the first process)
+    process_list = add_arrived_processes_to_ready_queue(ready_queue, process_list)
+
+
+    # Run this algorithm as long as the ready queue has processes inside
+    while ready_queue:
+
+        # Take a process out of the current waiting process queue and note the context switch
+        running_process = ready_queue.pop(0)
+        schedule.append((current_time, running_process.id))
+
+        if running_process.burst_time <= time_quantum:
+            # If the process runs within the time quantum, it is done and we just take as much time as the burst time of that process
+            current_time += running_process.burst_time
+            running_process.burst_time = 0
+            process_list = add_arrived_processes_to_ready_queue(ready_queue, process_list)
+        else:
+            # The process exceeds TQ - need to pre-empt and put to back of queue
+            running_process.burst_time -= time_quantum
+            current_time += time_quantum
+            # before we add the running process back to the list, add any new processes
+            process_list = add_arrived_processes_to_ready_queue(ready_queue, process_list)
+            ready_queue.append(running_process)
+        
+    
+    return (schedule, 0.0)
 
 def SRTF_scheduling(process_list):
     return (["to be completed, scheduling process_list on SRTF, using process.burst_time to calculate the remaining time of the current process "], 0.0)
@@ -85,7 +138,7 @@ def main(argv):
     FCFS_schedule, FCFS_avg_waiting_time =  FCFS_scheduling(process_list)
     write_output('FCFS.txt', FCFS_schedule, FCFS_avg_waiting_time )
     print ("simulating RR ----")
-    RR_schedule, RR_avg_waiting_time =  RR_scheduling(process_list,time_quantum = 2)
+    RR_schedule, RR_avg_waiting_time =  RR_scheduling(process_list,time_quantum = 4) #default TQ = 2
     write_output('RR.txt', RR_schedule, RR_avg_waiting_time )
     print ("simulating SRTF ----")
     SRTF_schedule, SRTF_avg_waiting_time =  SRTF_scheduling(process_list)
