@@ -26,11 +26,15 @@ input_file = 'input.txt'
 DEBUG = True
 
 class Process:
-    last_scheduled_time = 0
     def __init__(self, id, arrive_time, burst_time):
         self.id = id
         self.arrive_time = arrive_time
         self.burst_time = burst_time
+
+        # Design decision: last time we could have been scheduled is the time we arrived
+        # We need not necessarily have been actually scheduled at this time
+        # Can use this to immediate subtract current time
+        self.last_scheduled_time = arrive_time 
     #for printing purpose
     def __repr__(self):
         return ('[id %d : arrive_time %d,  burst_time %d]'%(self.id, self.arrive_time, self.burst_time))
@@ -69,6 +73,7 @@ def RR_scheduling(process_list, time_quantum ):
     schedule = []
     current_time = 0
     waiting_time = 0
+    total_processes = len(process_list)
     ready_queue = []
 
     def add_arrived_processes_to_ready_queue(old_ready_queue, process_list):
@@ -89,6 +94,11 @@ def RR_scheduling(process_list, time_quantum ):
         running_process = ready_queue.pop(0)
         schedule.append((current_time, running_process.id))
 
+        # Check if this process has waited - if so, add it to the wait counter
+        #print "Process: " + str(running_process) + " last scheduled: " + str(running_process.last_scheduled_time) + ". Current time: " + str(current_time) + ", total waiting time so far: " + str(waiting_time)
+        waiting_time += current_time - running_process.last_scheduled_time
+        #print "New waiting time: " + str(waiting_time)
+
         if running_process.burst_time <= time_quantum:
             # If the process runs within the time quantum, it is done and we just take as much time as the burst time of that process
             current_time += running_process.burst_time
@@ -102,8 +112,9 @@ def RR_scheduling(process_list, time_quantum ):
             process_list = add_arrived_processes_to_ready_queue(ready_queue, process_list)
             ready_queue.append(running_process)
         
-    
-    return (schedule, 0.0)
+        running_process.last_scheduled_time = current_time
+
+    return (schedule, waiting_time/float(total_processes))
 
 def SRTF_scheduling(process_list):
     return (["to be completed, scheduling process_list on SRTF, using process.burst_time to calculate the remaining time of the current process "], 0.0)
