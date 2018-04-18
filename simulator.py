@@ -232,9 +232,9 @@ def SJF_scheduling(process_list, alpha):
     return (["to be completed, scheduling SJF without using information from process.burst_time"],0.0)
 
 
-def read_input():
+def read_input(input_filename):
     result = []
-    with open(input_file) as f:
+    with open(input_filename) as f:
         for line in f:
             array = line.split()
             if (len(array)!= 3):
@@ -250,7 +250,8 @@ def write_output(file_name, schedule, avg_waiting_time):
 
 
 def main(argv):
-    process_list = read_input()
+    input_filename = argv[0] if argv else input_file
+    process_list = read_input(input_filename)
     print ("printing input ----")
     for process in process_list:
         print (process)
