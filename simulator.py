@@ -228,8 +228,105 @@ def SRTF_scheduling(process_list):
 
     return (schedule, waiting_time/float(total_processes))
 
+class SJFPrediction:
+    def __init__(self, process, alpha):
+        self.process = process
+        self.alpha = alpha
+        self.previous_burst_time = 5
+        self.previous_burst_prediction = 5
+        self.current_prediction = 5
+
+    def update_and_compute_prediction(self, current_burst_time):
+        self.previous_burst_time = current_burst_time
+        return self.compute_new_prediction()
+    
+    def compute_new_prediction(self):
+        old_prediction = self.current_prediction
+        self.current_prediction = (self.alpha * self.previous_burst_time)  \
+                                + ((1 - self.alpha) * self.previous_burst_prediction)
+        self.previous_burst_prediction = old_prediction
+        return self.current_prediction
+
+    #for printing purpose
+    def __repr__(self):
+        return ('[proc %s : prev burst %d,  previous_burst_prediction %d, current_prediction %d]'%(str(self.process), self.previous_burst_time, self.previous_burst_prediction, self.current_prediction))
+    
+    def __cmp__(self, other):
+        # For priority queue
+        return cmp(self.current_prediction, other.current_prediction)
+
 def SJF_scheduling(process_list, alpha):
-    return (["to be completed, scheduling SJF without using information from process.burst_time"],0.0)
+    '''
+    SJF: Non-preemptive but predictive scheduling
+    - Once a process arrives - create object that tracks SJF characteristics
+    - Store 3 things about it: 
+        - previous_burst_time = how long it took during this burst (t_n) [init 5]
+        - previous_predicted_burst_time = what the previous predicted burst value was  [init 5]
+        - current prediction of how long it'll take [init 5]
+    - 
+    '''
+    # Copy processes to allow modification inside here
+    process_list = copy.deepcopy(process_list)
+
+    if not process_list:
+        return (["no processes given"], 0.0)
+    
+    schedule = []
+    current_time = 0 # This is ok since there will ALWAYS be a t = 0 process
+    waiting_time = 0
+    total_processes = len(process_list)
+    ready_queue =  PriorityQueue() # Note: This will not be stable - but we will always get A short job
+
+    # Mapping between process ID and a SJFPrediction
+    # There will only ever by one SJFPrediction per id 
+    prediction_dict = {}
+
+    def add_arrived_processes_to_ready_queue(ready_queue, process_list):
+        arrived_processes = filter(lambda p: p.arrive_time <= current_time, process_list)
+        remaining_processes = filter(lambda p: p.arrive_time > current_time, process_list)
+        # Fill our priority queue with any arrived processes
+        for proc in arrived_processes:
+            # Check if a SJFPrediction already exists for this process ID
+            if proc.id in prediction_dict:
+                existing_prediction = prediction_dict[proc.id]
+                # Defensive prog: if SJFPrediction still bound  to a process - error out
+                if existing_prediction.process:
+                    raise Exception("SJFPrediction still bound: " + str(proc))
+                # Re-set the process being tracked for this prediction
+                # Assumption is that this prediction has already been updated
+                existing_prediction.process = proc
+                ready_queue.put(existing_prediction)
+
+            else:
+                # Need to create a SJFPrediction for this process
+                new_prediction = SJFPrediction(proc, alpha)
+                prediction_dict[proc.id] = new_prediction
+                ready_queue.put(new_prediction)
+
+
+        return remaining_processes
+
+    while process_list or not ready_queue.empty():
+
+        print prediction_dict 
+        # Try to dequeue a process: is a process able to run now?
+        if ready_queue.empty():
+            # Process list must have a process. Set current time to that of soonest process
+            current_time = process_list[0].arrive_time
+            process_list = add_arrived_processes_to_ready_queue(ready_queue, process_list)
+        
+        # Take process with lowest predicted burst time
+        running_prediction = ready_queue.get()
+        schedule.append((current_time, running_prediction.process.id))
+        waiting_time += current_time - running_prediction.process.arrive_time
+        # Advance the current time by the procs' burst to complete the process
+        current_time += running_prediction.process.burst_time
+        # Update the prediction for this process based on the burst time
+        running_prediction.update_and_compute_prediction(running_prediction.process.burst_time)
+        # Unset the current process in the prediction
+        running_prediction.process = None 
+
+    return (schedule, waiting_time/float(total_processes))
 
 
 def read_input(input_filename):
