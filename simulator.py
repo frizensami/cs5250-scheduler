@@ -187,6 +187,10 @@ def SRTF_scheduling(process_list):
         if running_process is None and shortest_process:
             # No process currently running - start with the shortest process to completion
             running_process = shortest_process
+            # Check if the new process has waited
+            waiting_time += current_time - running_process.last_scheduled_time
+            if current_time - running_process.last_scheduled_time > 0:
+                print "Proc " + str(running_process) + " waited " + str(current_time - running_process.last_scheduled_time) + " units"
             # Context switch - note
             schedule.append((current_time, running_process.id))
         elif shortest_process:
@@ -194,7 +198,16 @@ def SRTF_scheduling(process_list):
             if shortest_process < running_process:
                 # If shortest process is shorter, requeue the current proc and swap in the shortest proc
                 ready_queue.put(running_process)
+                # Note when this process was last scheduled
+                running_process.last_scheduled_time = current_time
+
                 running_process = shortest_process
+                # Update waiting time
+                waiting_time += current_time - running_process.last_scheduled_time
+
+                if current_time - running_process.last_scheduled_time > 0:
+                    print "Proc " + str(running_process) + " waited " +  str(current_time - running_process.last_scheduled_time) + " units"
+
                 # Context switch - note
                 schedule.append((current_time, running_process.id))
             else:
@@ -213,7 +226,7 @@ def SRTF_scheduling(process_list):
 
 
 
-    return (schedule, 0.0)
+    return (schedule, waiting_time/float(total_processes))
 
 def SJF_scheduling(process_list, alpha):
     return (["to be completed, scheduling SJF without using information from process.burst_time"],0.0)
