@@ -312,7 +312,8 @@ def SJF_scheduling(process_list, alpha):
         # Try to dequeue a process: is a process able to run now?
         if ready_queue.empty():
             # Process list must have a process. Set current time to that of soonest process
-            current_time = process_list[0].arrive_time
+            if process_list[0].arrive_time > current_time:
+                current_time = process_list[0].arrive_time
             process_list = add_arrived_processes_to_ready_queue(ready_queue, process_list)
         
         # Take process with lowest predicted burst time
