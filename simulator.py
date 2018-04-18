@@ -19,7 +19,8 @@ Revision 2:
     Thanks Lee Wei Ping for trying and pointing out the difficulty & ambiguity with future_prediction SRTF.
 '''
 import sys
-from Queue import Queue
+import copy
+from Queue import PriorityQueue
 
 input_file = 'input.txt'
 
@@ -38,6 +39,10 @@ class Process:
     #for printing purpose
     def __repr__(self):
         return ('[id %d : arrive_time %d,  burst_time %d]'%(self.id, self.arrive_time, self.burst_time))
+    
+    def __cmp__(self, other):
+        # For priority queue
+        return cmp(self.burst_time, other.burst_time)
 
 def FCFS_scheduling(process_list):
     #store the (switching time, proccess_id) pair
@@ -56,7 +61,7 @@ def FCFS_scheduling(process_list):
 #Input: process_list, time_quantum (Positive Integer)
 #Output_1 : Schedule list contains pairs of (time_stamp, proccess_id) indicating the time switching to that proccess_id
 #Output_2 : Average Waiting Time
-def RR_scheduling(process_list, time_quantum ):
+def RR_scheduling(process_list, time_quantum):
     '''
     RR Scheduling:
         - When a process arrives, it's enqueued into a ready queue
@@ -67,11 +72,14 @@ def RR_scheduling(process_list, time_quantum ):
                 - Process is done : nothing to do
                 - Process not done: needs to go back into ready queue
     '''
+    # Copy processes to allow modification inside here
+    process_list = copy.deepcopy(process_list)
+
     if not process_list:
         return (["no processes given"], 0.0)
 
     schedule = []
-    current_time = 0
+    current_time = 0 # This is ok since there will ALWAYS be a t = 0 process
     waiting_time = 0
     total_processes = len(process_list)
     ready_queue = []
@@ -117,7 +125,75 @@ def RR_scheduling(process_list, time_quantum ):
     return (schedule, waiting_time/float(total_processes))
 
 def SRTF_scheduling(process_list):
-    return (["to be completed, scheduling process_list on SRTF, using process.burst_time to calculate the remaining time of the current process "], 0.0)
+    '''
+    SRTF Scheduling
+    - Jobs arrive - put into priority queue
+    - Take highest priority job (lowest burst time remaining)
+    - Execute one time step. Lower burst time of current job
+    - Check for new jobs
+    - Put into priority queue
+    - If highest priority (lowest burst time job) has lower burst time than current job, swap out
+    '''
+    # Copy processes to allow modification inside here
+    process_list = copy.deepcopy(process_list)
+
+    if not process_list:
+        return (["no processes given"], 0.0)
+
+    schedule = []
+    current_time = 0
+    waiting_time = 0
+    total_processes = len(process_list)
+    ready_queue =  PriorityQueue() # Note: This will not be stable - but we will always get A short job
+
+    def add_arrived_processes_to_ready_queue(ready_queue, process_list):
+        arrived_processes = filter(lambda p: p.arrive_time <= current_time, process_list)
+        remaining_processes = filter(lambda p: p.arrive_time > current_time, process_list)
+        
+        # Fill our priority queue with any arrived processes
+        for proc in arrived_processes:
+            ready_queue.put(proc)
+
+        return remaining_processes
+
+
+    running_process = None
+    # Different strategy for SRTF: tick the time t by 1 every time and check for new process
+    while process_list or not ready_queue.empty():
+        # Add arrived processes before we start (should just be the first process)
+        process_list = add_arrived_processes_to_ready_queue(ready_queue, process_list)
+
+        # Prepare the current shortest waiting process for comparison
+        shortest_process = ready_queue.get()
+
+        if running_process is None:
+            # No process currently running - start with the shortest process to completion
+            running_process = shortest_process
+            # Context switch - note
+            schedule.append((current_time, running_process.id))
+        else:
+            # Compare running process to shortest process in queue currently
+            if shortest_process < running_process:
+                # If shortest process is shorter, requeue the current proc and swap in the shortest proc
+                ready_queue.put(running_process)
+                running_process = shortest_process
+                # Context switch - note
+                schedule.append((current_time, running_process.id))
+            else:
+                # Otherwise shortest process goes back into the queue
+                ready_queue.put(shortest_process)
+
+        running_process.burst_time -= 1
+        current_time += 1
+
+        # Process has finally completed - not on any list anymore
+        if running_process.burst_time == 0:
+            running_process = None
+
+
+
+
+    return (schedule, 0.0)
 
 def SJF_scheduling(process_list, alpha):
     return (["to be completed, scheduling SJF without using information from process.burst_time"],0.0)
