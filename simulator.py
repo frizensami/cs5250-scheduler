@@ -91,16 +91,26 @@ def RR_scheduling(process_list, time_quantum):
         old_ready_queue.extend(arrived_processes)
         return remaining_processes
 
-    # Add arrived processes before we start (should just be the first process)
-    process_list = add_arrived_processes_to_ready_queue(ready_queue, process_list)
 
-
+    last_process = None
+    running_process = None
     # Run this algorithm as long as the ready queue has processes inside
-    while ready_queue:
+    while ready_queue or process_list:
+        if not ready_queue:
+            # Nothing is ready to go but still have processes to execute
+            # Advance time to next process
+            current_time = process_list[0].arrive_time
+            # Add arrived processes before we start (should just be the first process)
+            process_list = add_arrived_processes_to_ready_queue(ready_queue, process_list)
+
 
         # Take a process out of the current waiting process queue and note the context switch
+        last_process = running_process
         running_process = ready_queue.pop(0)
-        schedule.append((current_time, running_process.id))
+
+        if last_process is None or running_process.id != last_process.id:
+            # Check that this is truly a context switch
+            schedule.append((current_time, running_process.id))
 
         # Check if this process has waited - if so, add it to the wait counter
         #print "Process: " + str(running_process) + " last scheduled: " + str(running_process.last_scheduled_time) + ". Current time: " + str(current_time) + ", total waiting time so far: " + str(waiting_time)
@@ -159,19 +169,27 @@ def SRTF_scheduling(process_list):
 
     running_process = None
     # Different strategy for SRTF: tick the time t by 1 every time and check for new process
-    while process_list or not ready_queue.empty():
+    while process_list or not ready_queue.empty() or running_process is not None:
+        #print "Current time: " + str(current_time)
+        #print "Running process: " + str(running_process)
+        #print "Process list status: " + str(process_list)
+        #print "Ready queue: " + str(ready_queue.queue)
+        #print "--------------------"
         # Add arrived processes before we start (should just be the first process)
         process_list = add_arrived_processes_to_ready_queue(ready_queue, process_list)
 
         # Prepare the current shortest waiting process for comparison
-        shortest_process = ready_queue.get()
+        if not ready_queue.empty():
+            shortest_process = ready_queue.get()
+        else:
+            shortest_process = None
 
-        if running_process is None:
+        if running_process is None and shortest_process:
             # No process currently running - start with the shortest process to completion
             running_process = shortest_process
             # Context switch - note
             schedule.append((current_time, running_process.id))
-        else:
+        elif shortest_process:
             # Compare running process to shortest process in queue currently
             if shortest_process < running_process:
                 # If shortest process is shorter, requeue the current proc and swap in the shortest proc
@@ -183,13 +201,15 @@ def SRTF_scheduling(process_list):
                 # Otherwise shortest process goes back into the queue
                 ready_queue.put(shortest_process)
 
-        running_process.burst_time -= 1
+        # Modify running process state - tick down if there is one
+        if running_process:
+            running_process.burst_time -= 1
+            # Process has finally completed - not on any list anymore
+            if running_process.burst_time == 0:
+                running_process = None
+        
+        # Increase tick
         current_time += 1
-
-        # Process has finally completed - not on any list anymore
-        if running_process.burst_time == 0:
-            running_process = None
-
 
 
 
